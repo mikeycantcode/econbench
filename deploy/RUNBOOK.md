@@ -7,7 +7,7 @@ Path from a blank Ubuntu 24.04 box to a running benchmark, plus operator duties.
 On a fresh Ubuntu 24.04 VPS, as root:
 
 ```bash
-git clone <THIS_REPO_URL> /tmp/econbench-setup
+git clone https://github.com/mikeycantcode/econbench.git /tmp/econbench-setup
 cd /tmp/econbench-setup
 bash deploy/setup-vps.sh
 ```
@@ -19,8 +19,8 @@ it; symlinks the compiled extension into `/home/survivor/.pi/extensions/`;
 copies `deploy/APPEND_SYSTEM.md` into `/home/survivor/.pi/`; and generates a
 fresh wallet into `/home/survivor/econbench-state/wallet.json`.
 
-Note: the script's own `<THIS_REPO_URL>` clone should point at the same repo
-you're running the script from — fill in the placeholder before running.
+Note: the script clones `https://github.com/mikeycantcode/econbench.git`. If you
+fork the repo, update the clone URL in `deploy/setup-vps.sh` to match.
 
 ## 2. Env file
 

@@ -8,7 +8,7 @@ useradd -m -s /bin/bash survivor
 usermod -aG sudo survivor
 echo 'survivor ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/survivor && chmod 440 /etc/sudoers.d/survivor
 BASE=/home/survivor
-git clone <THIS_REPO_URL> $BASE/econbench && cd $BASE/econbench && npm ci
+git clone https://github.com/mikeycantcode/econbench.git $BASE/econbench && cd $BASE/econbench && npm ci
 # Ready-to-use browser automation: Playwright + its own Chromium build, installed
 # for the survivor user so the agent scripts pages on day 1 instead of fighting tooling.
 sudo -u survivor mkdir -p $BASE/browser && cd $BASE/browser
