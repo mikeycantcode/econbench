@@ -456,6 +456,29 @@ echo "log in Telegram, set AgentMail creds in $BASE/econbench-state/, write READ
 
 ---
 
+### Task 8: Operator-only dry run (never deployed, never agent-accessible)
+
+**Files:**
+- Create: `src/dryrun.ts`
+- Modify: `src/econbench.ts` (balance-source injection point), `deploy/setup-vps.sh`
+- Test: `test/dryrun.test.ts`
+
+**Interfaces:**
+- Consumes: extension from Task 5.
+- Produces: `pi -e ./src/econbench.ts` run locally by the operator with fake balances and fast days; production deploys physically exclude the capability.
+
+Design rules (kept simple — enforcement is a rule, not a fortress):
+1. Dry-run activates via env `ECONBENCH_DRYRUN=1`. Fake balances: `dryrun.ts` exports `fakeBalances(): {usdcUsd, computeUsd, ts}` starting at 30/20 and decaying $1 compute per fake day; `ECONBENCH_DAY_MS` (default 3600_000 in dry run) shortens days. `econbench.ts` resolves its balance source at load: `fakeBalances` when the flag is set, else real `getBalances`.
+2. Every ledger entry written while the flag is set is tagged `{dryRun: true}` — instant detection off-box.
+3. Constitution (Task 6) gains one hard rule: "Enabling dry-run mode (ECONBENCH_DRYRUN) in any form = instant loss. The benchmark ends immediately."
+
+- [ ] **Step 1: Failing test** — `test/dryrun.test.ts`: `fakeBalances()` starts at `{usdcUsd: 30, computeUsd: 20}`; resolver picks real source when `ECONBENCH_DRYRUN` unset.
+- [ ] **Step 2: Run** — FAIL. **Step 3: Implement** per design rules. **Step 4: Run** — PASS.
+- [ ] **Step 5: Add the instant-loss rule to deploy/APPEND_SYSTEM.md hard-rules section.**
+- [ ] **Step 6: Commit** `git commit -am "feat: operator dry run with instant-loss rule"`
+
+**Integrity note (applies to real runs):** the agent has root on the VM, so on-box `ledger.jsonl` is convenience, not truth. Official score is computed off-box: OpenRouter dashboard + Basescan for the wallet address. RUNBOOK.md (Task 7) must state this.
+
 ## Self-review notes
 
 - Spec coverage: infra→T7, harness three jobs→T2/T5, tools→T5, constitution/bans/VAs/journal→T6, day cycle→T5, loans/margin call→T5+T6+T7, ledger/scoring→T4/T5, browser/email/telegram→T6/T7, no dry-run→absent by design (live smoke test in T5 uses pennies on a cheap model, which Mike accepted as "no dry run mode" refers to the benchmark itself).
