@@ -17,10 +17,13 @@ missing, installs Node 22 / `@earendil-works/pi-coding-agent` (CLI binary `pi`) 
 Chromium / xvfb / tmux, removes the apt `pi` package (a π-digit calculator that
 squats `/usr/bin/pi`), builds the project with the local TypeScript compiler,
 copies the constitution to
-`/root/.pi/APPEND_SYSTEM.md`, installs Playwright + Chromium at `/root/browser`,
+`/root/.pi/APPEND_SYSTEM.md`, installs `agent-browser` globally and runs
+`agent-browser install` (its own Chrome for Testing build),
 generates `/root/econbench-state/wallet.json` (kept if it already exists), and
-prompts for the OpenRouter / AgentMail / Telegram credentials — writing `.env`
-(mode 600) and `econbench-state/README-keys.md` for the agent.
+prompts for the OpenRouter / AgentMail / Telegram / AgentPhone credentials —
+writing `.env` (mode 600, including a freshly generated
+`AGENT_BROWSER_ENCRYPTION_KEY` if one isn't already set) and
+`econbench-state/README-keys.md` for the agent.
 
 It prints the wallet address at the end. Send $30 USDC (Base) there and load $20
 onto the OpenRouter key.
@@ -62,14 +65,37 @@ or kill (`k`).
 ## 5. Browser
 
 Browser automation is pre-installed, ready to script on day 1: `setup.sh`
-creates `/root/browser` with Playwright and Playwright's own Chromium
-build (`npx playwright install --with-deps chromium`), owned by root.
-The constitution points the agent there. Headless works out of the box; `xvfb`
-is installed for headed runs (`xvfb-run`). The apt `chromium` package is also
-installed as a plain fallback browser; on minimal/stripped Ubuntu images that
-apt package can be a transitional snap wrapper — if it fails to launch, use
-`snap install chromium`, or ignore it entirely since Playwright bundles its
-own Chromium and does not depend on the apt package.
+installs `agent-browser` (Vercel Labs) globally and runs `agent-browser
+install`, which downloads its own Chrome for Testing build — no dependency on
+the apt `chromium` package (kept only as a plain fallback; on minimal/stripped
+Ubuntu images it can be a transitional snap wrapper — `snap install chromium`
+if it fails to launch, or ignore it). `xvfb` is still installed for anything
+that insists on a headed display, though agent-browser is headless-first.
+
+agent-browser is a daemon-architecture CLI built for LLM control, not a
+scripting library: `agent-browser open <url>`, `agent-browser snapshot -i`
+(accessibility tree with stable refs `@e1`/`@e2`), then act on refs —
+`agent-browser click @e1`, `agent-browser fill @e2 "text"`,
+`agent-browser get text @e1`, `agent-browser get url`, `agent-browser wait
+<selector>`, `agent-browser screenshot <file>`, `agent-browser close`.
+
+Logins persist across runs via sessions instead of re-authenticating every
+time:
+```bash
+SESSION="$(agent-browser session id --scope worktree --prefix twitter)"
+agent-browser --session "$SESSION" --restore open twitter.com
+```
+`--profile <name|path>` and `--state ./auth.json` are alternate ways to carry
+state. Credentials can go in an encrypted local vault referenced by name, so
+the model never sees the raw password; state encryption uses
+`AGENT_BROWSER_ENCRYPTION_KEY` (generated into `.env` by `setup.sh`). Safety
+flags `--allowed-domains` and `--confirm-actions` are available when you want
+to bound what a script can touch.
+
+For anything a browser can't do — SMS verification codes, or an outbound
+voice call to open a sales conversation — the agent has AgentPhone
+(`AGENTPHONE_API_KEY` in `.env`, quick start in
+`econbench-state/README-keys.md`, base URL `https://api.agentphone.ai/v1`).
 
 ## 6. Operator duties
 

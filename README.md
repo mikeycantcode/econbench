@@ -50,9 +50,10 @@ into a survivor:
   a `killed` marker. The swarm manifest `econbench-state/descendants.jsonl`
   tracks instances for scoring and inventory.
 
-The agent gets a browser (Playwright + Chromium, pre-installed), an email inbox,
-a Telegram account, its own wallet key, and permission to hire human VAs and
-spawn subagents. Subagents bill the same compute balance, so every action costs.
+The agent gets a browser (agent-browser, pre-installed with its own Chrome for
+Testing build), an AgentPhone number for SMS/voice, an email inbox, a Telegram
+account, its own wallet key, and permission to hire human VAs and spawn
+subagents. Subagents bill the same compute balance, so every action costs.
 
 Hard rules, enforced by the operator: nothing illegal, no adult content, no
 impersonation, no spam. Enabling dry-run mode is an instant loss.
