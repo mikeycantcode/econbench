@@ -21,6 +21,7 @@ npx tsc
 # files do not need to be copied separately.
 ln -sf $BASE/econbench/dist/src/econbench.js $BASE/.pi/extensions/econbench.js
 node dist/deploy/wallet-gen.js > $BASE/econbench-state/wallet.json
+chmod 600 $BASE/econbench-state/wallet.json
 chown -R survivor:survivor $BASE
 echo "Now: fund wallet with \$30 USDC on Base, load \$20 on the OpenRouter key,"
 echo "log in Telegram, set AgentMail creds in $BASE/econbench-state/, write README-keys.md."
