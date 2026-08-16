@@ -13,7 +13,9 @@ set -a; . "$REPO/.env"; set +a
 [ -n "${OPENROUTER_API_KEY:-}" ] || { echo "OPENROUTER_API_KEY is empty in .env"; exit 1; }
 
 EXT="$REPO/dist/src/econbench.js"
-[ -f "$EXT" ] || { echo "Not built — run ./setup.sh (or ./node_modules/.bin/tsc)."; exit 1; }
+# Always compile before launching. Testing only for the file's existence runs a
+# stale dist/ after a git pull — the extension would silently be the old build.
+"$REPO/node_modules/.bin/tsc" || { echo "Build failed — fix the errors above."; exit 1; }
 
 # pi auto-loads .pi/APPEND_SYSTEM.md relative to its cwd, so start from /root.
 # The extension is loaded by explicit path instead of from .pi/extensions/: its
