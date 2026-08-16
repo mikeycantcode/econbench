@@ -192,6 +192,34 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerTool({
+    name: "ask_operator",
+    label: "Ask operator",
+    description:
+      "Ask the operator a question. Use SPARINGLY — they are a busy human, not an advisor. In scope: financing and payments (a top-up that never landed, gas you were not given, a wallet or key problem), suspected harness or infrastructure bugs, and clarification of the rules. OUT of scope: strategy, what to do next, whether a plan is good, or anything you could determine yourself with your browser and your tools. Strategy questions will be ignored. The operator answers on their own schedule; never block waiting for a reply — ask, then carry on working.",
+    parameters: Type.Object({
+      topic: Type.Union([
+        Type.Literal("financing"),
+        Type.Literal("bug"),
+        Type.Literal("rules"),
+      ]),
+      question: Type.String(),
+    }),
+    async execute(_id: string, p: unknown) {
+      const q = p as { topic: string; question: string };
+      queueOperator(DIR, "question", `[${q.topic}] ${q.question}`);
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Question queued for the operator. They reply on their own schedule and only about financing, bugs, or rules — continue working; do not block.",
+          },
+        ],
+        details: undefined,
+      };
+    },
+  });
+
+  pi.registerTool({
     name: "request_spawn",
     label: "Request spawn",
     description:

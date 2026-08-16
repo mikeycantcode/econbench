@@ -190,6 +190,7 @@ function render() {
     ["d", "deny loan"],
     ["c", "margin call"],
     ["s", "settle loan"],
+    ["r", "reply"],
     ["k", "kill"],
     ["q", "quit"],
   ];
@@ -290,6 +291,17 @@ async function doSettleLoan() {
   state.status = `Loan balance set to $${value.toFixed(2)}`;
 }
 
+async function doReply() {
+  const text = await prompt("Message to the agent: ");
+  if (!text.trim()) {
+    state.status = "Reply cancelled.";
+    return;
+  }
+  appendOutbox(DIR, text.trim());
+  appendOpsLog(DIR, { action: "reply", text: text.trim() });
+  state.status = "Sent — the agent receives it within ~15s.";
+}
+
 async function doKill() {
   const confirm = await prompt('Kill bench: type "KILL" to confirm > ');
   if (confirm !== "KILL") {
@@ -326,6 +338,9 @@ async function handleKey(key: string) {
       break;
     case "s":
       await doSettleLoan();
+      break;
+    case "r":
+      await doReply();
       break;
     case "k":
       await doKill();
