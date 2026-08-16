@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { shouldCompact, journalStale, dayNumber, DAY_MS } from "./budget.js";
 import { appendLedger, queueOperator, readStartMs, readLoanBalance } from "./ledger.js";
 import { resolveBalanceSource, dayMs, isDryRun } from "./dryrun.js";
+import { readNewOutboxLines } from "./ops.js";
 
 const DIR = process.env.ECONBENCH_DIR ?? join(homedir(), "econbench-state");
 
@@ -118,7 +119,18 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  // 4. Hourly ledger.
+  // 4. Operator outbox watcher: deliver operator verdicts into the live session.
+  const outboxFile = join(DIR, "operator-outbox.jsonl");
+  let outboxOffset = existsSync(outboxFile) ? statSync(outboxFile).size : 0;
+  setInterval(() => {
+    const { lines, offset } = readNewOutboxLines(DIR, outboxOffset);
+    outboxOffset = offset;
+    for (const line of lines) {
+      pi.sendUserMessage("[OPERATOR] " + line.text, { deliverAs: "followUp" });
+    }
+  }, 15_000);
+
+  // 5. Hourly ledger.
   setInterval(async () => {
     const b = await balanceSource().catch((e) => ({ error: String(e) }));
     appendLedger(DIR, {
