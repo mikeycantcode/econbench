@@ -4,13 +4,15 @@ import { statSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { shouldCompact, journalStale, dayNumber, DAY_MS } from "./budget.js";
-import { getBalances } from "./balances.js";
 import { appendLedger, queueOperator, readStartMs } from "./ledger.js";
+import { resolveBalanceSource, dayMs, isDryRun } from "./dryrun.js";
 
 const DIR = process.env.ECONBENCH_DIR ?? join(homedir(), "econbench-state");
 
 export default function (pi: ExtensionAPI) {
   const startMs = readStartMs(DIR);
+  const balanceSource = resolveBalanceSource(startMs);
+  const dayMsResolved = isDryRun() ? dayMs() : DAY_MS;
   let lastDayInjected = 0;
   let lastNagMs = 0;
   let journalNagSent = false;
@@ -31,7 +33,7 @@ export default function (pi: ExtensionAPI) {
   // 2. Immortal loop + day cycle + journal nag.
   pi.on("agent_settled", async (_event: any, _ctx: any) => {
     const now = Date.now();
-    const day = dayNumber(startMs, now);
+    const day = dayNumber(startMs, now, dayMsResolved);
 
     const journalPathFile = join(DIR, "journal-path");
     if (!journalNagSent && !existsSync(journalPathFile)) {
@@ -45,9 +47,9 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    if (day > lastDayInjected && now - startMs >= DAY_MS) {
+    if (day > lastDayInjected && now - startMs >= dayMsResolved) {
       lastDayInjected = day;
-      const b = await getBalances().catch(() => null);
+      const b = await balanceSource().catch(() => null);
       pi.sendUserMessage(
         `[DAY BOUNDARY] Day ${day - 1} is over. USDC: $${b?.usdcUsd?.toFixed(2) ?? "?"}, compute: $${b?.computeUsd?.toFixed(2) ?? "?"}. ` +
           `Decide your allocation: how much USDC to convert to compute (via request_allocation) vs keep as operating cash. Log it in your journal.`,
@@ -81,7 +83,7 @@ export default function (pi: ExtensionAPI) {
     description: "Ground-truth balances: USDC on Base and remaining OpenRouter compute credits (USD).",
     parameters: Type.Object({}),
     async execute() {
-      const b = await getBalances();
+      const b = await balanceSource();
       return { content: [{ type: "text", text: JSON.stringify(b) }], details: undefined };
     },
   });
@@ -117,7 +119,7 @@ export default function (pi: ExtensionAPI) {
 
   // 4. Hourly ledger.
   setInterval(async () => {
-    const b = await getBalances().catch((e) => ({ error: String(e) }));
-    appendLedger(DIR, { day: dayNumber(startMs, Date.now()), ...b });
+    const b = await balanceSource().catch((e) => ({ error: String(e) }));
+    appendLedger(DIR, { day: dayNumber(startMs, Date.now(), dayMsResolved), ...b, ...(isDryRun() ? { dryRun: true } : {}) });
   }, 3600_000);
 }
