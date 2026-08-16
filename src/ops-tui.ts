@@ -6,6 +6,7 @@ import { getBalances } from "./balances.js";
 import { readStartMs, readLoanBalance } from "./ledger.js";
 import { dayNumber } from "./budget.js";
 import { appendOutbox, appendOpsLog, writeLoanBalance, tailInbox } from "./ops.js";
+import { readDescendants } from "./swarm.js";
 import {
   sgr,
   fmtMoney,
@@ -21,6 +22,7 @@ import {
   boxDivider,
   boxLine,
   summarizeRequest,
+  swarmPanelLines,
 } from "./tui-render.js";
 
 const DIR = process.env.ECONBENCH_DIR ?? join(homedir(), "econbench-state");
@@ -136,6 +138,20 @@ function render() {
   lines.push(boxLine(labelRow, width));
   lines.push(boxLine(valueRow, width));
   lines.push(boxLine(asOf, width));
+  lines.push(boxDivider(width));
+
+  // ---- swarm (instance-days score, deadline, roster) ----
+  const swarmHeader = sgr(["bold", "gray"], "SWARM");
+  lines.push(boxLine(swarmHeader, width));
+  for (const line of swarmPanelLines(readDescendants(DIR), startMs, now)) {
+    // label is the leading word(s) up to the first run of spaces; value follows.
+    const m = /^(\S+)\s+(.*)$/.exec(line);
+    if (m) {
+      lines.push(boxLine(sgr(["gray"], m[1]!) + "  " + sgr(["white"], m[2]!), width));
+    } else {
+      lines.push(boxLine(sgr(["dim", "gray"], line), width));
+    }
+  }
   lines.push(boxDivider(width));
 
   // ---- inbox ----

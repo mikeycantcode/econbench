@@ -5,7 +5,7 @@ export function appendLedger(dir: string, entry: object) {
   appendFileSync(join(dir, "ledger.jsonl"), JSON.stringify({ ts: new Date().toISOString(), ...entry }) + "\n");
 }
 
-export function queueOperator(dir: string, kind: "allocation" | "loan", body: string) {
+export function queueOperator(dir: string, kind: "allocation" | "loan" | "spawn", body: string) {
   appendFileSync(join(dir, "operator-inbox.jsonl"),
     JSON.stringify({ ts: new Date().toISOString(), kind, body }) + "\n");
 }

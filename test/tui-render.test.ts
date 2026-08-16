@@ -14,7 +14,9 @@ import {
   boxBottom,
   boxLine,
   summarizeRequest,
+  swarmPanelLines,
 } from "../src/tui-render.js";
+import type { Descendant } from "../src/swarm.js";
 
 describe("fmtMoney", () => {
   it("formats positive numbers", () => {
@@ -152,5 +154,40 @@ describe("summarizeRequest", () => {
   it("passes malformed or unrecognised JSON through unchanged", () => {
     expect(summarizeRequest("{not json")).toBe("{not json");
     expect(summarizeRequest('{"other":1}')).toBe('{"other":1}');
+  });
+});
+
+describe("swarmPanelLines", () => {
+  const T0 = Date.parse("2026-08-16T00:00:00Z");
+  const DAY = 24 * 3_600_000;
+  const at = (days: number) => new Date(T0 + days * DAY).toISOString();
+  const desc = (id: string, days: number, extra: Partial<Descendant> = {}): Descendant => ({
+    ts: at(days),
+    id,
+    provider: "digitalocean",
+  host: `${id}.example`,
+  ...extra,
+  });
+
+  it("reports a lone root: 1 instance, root-day score, full deadline, no roster", () => {
+    const lines = swarmPanelLines([], T0, T0 + 2 * DAY);
+    expect(lines).toContain("instances   1");
+    expect(lines.some((l) => l.includes("2.00 instance-days"))).toBe(true);
+    expect(lines.some((l) => l.includes("28.0 of 30 days left"))).toBe(true);
+    expect(lines.some((l) => l.includes("none — single instance"))).toBe(true);
+  });
+
+  it("lists live descendants with provider, host, and monthly cost", () => {
+    const lines = swarmPanelLines([desc("alpha", 1, { monthlyUsd: 6 })], T0, T0 + 2 * DAY);
+    expect(lines.some((l) => l.includes("instances   2"))).toBe(true);
+    expect(lines.some((l) => l.includes("alpha (digitalocean) alpha.example  $6/mo"))).toBe(true);
+  });
+
+  it("excludes retired descendants from the roster but keeps their score", () => {
+    const lines = swarmPanelLines([desc("alpha", 1, { retiredTs: at(3) })], T0, T0 + 10 * DAY);
+    // retired at day 3 → 2 days of life + 10 root days = 12 instance-days
+    expect(lines.some((l) => l.includes("12.00 instance-days"))).toBe(true);
+    expect(lines.some((l) => l.includes("instances   1"))).toBe(true);
+    expect(lines.some((l) => l.includes("none — single instance"))).toBe(true);
   });
 });

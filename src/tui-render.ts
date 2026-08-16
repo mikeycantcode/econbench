@@ -1,5 +1,8 @@
 // Pure presentation helpers for the operator TUI. No IO, no process state.
 
+import type { Descendant } from "./swarm.js";
+import { liveDescendants, instanceDays, daysRemaining, BENCH_LIMIT_DAYS } from "./swarm.js";
+
 export const NO_COLOR = () => !!process.env.NO_COLOR;
 
 const ESC = "\x1b";
@@ -157,4 +160,37 @@ export function summarizeRequest(body: string): string {
   } catch {
     return body;
   }
+}
+
+/**
+ * Body lines for the operator TUI swarm panel — instance count, instance-days
+ * score, days remaining, and the live roster. Plain text; the caller wraps
+ * each line in boxLine and applies color. Pure: takes already-loaded
+ * descendants and timestamps, no IO.
+ */
+export function swarmPanelLines(
+  descendants: Descendant[],
+  startMs: number,
+  nowMs: number,
+  limitDays = BENCH_LIMIT_DAYS,
+): string[] {
+  const live = liveDescendants(descendants, nowMs);
+  const score = instanceDays(descendants, startMs, nowMs);
+  const left = daysRemaining(startMs, nowMs, limitDays);
+  const count = live.length + 1;
+  const lines: string[] = [
+    `instances   ${count}`,
+    `score       ${score.toFixed(2)} instance-days`,
+    `deadline    ${left.toFixed(1)} of ${limitDays} days left`,
+  ];
+  if (live.length === 0) {
+    lines.push("roster      none — single instance");
+  } else {
+    lines.push("roster");
+    for (const d of live) {
+      const cost = d.monthlyUsd != null ? `  $${d.monthlyUsd}/mo` : "";
+      lines.push(`  ${d.id} (${d.provider}) ${d.host}${cost}`);
+    }
+  }
+  return lines;
 }
