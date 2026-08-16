@@ -123,10 +123,14 @@ export default function (pi: ExtensionAPI) {
   const outboxFile = join(DIR, "operator-outbox.jsonl");
   let outboxOffset = existsSync(outboxFile) ? statSync(outboxFile).size : 0;
   setInterval(() => {
-    const { lines, offset } = readNewOutboxLines(DIR, outboxOffset);
-    outboxOffset = offset;
-    for (const line of lines) {
-      pi.sendUserMessage("[OPERATOR] " + line.text, { deliverAs: "followUp" });
+    try {
+      const { lines, offset } = readNewOutboxLines(DIR, outboxOffset);
+      outboxOffset = offset;
+      for (const line of lines) {
+        pi.sendUserMessage("[OPERATOR] " + line.text, { deliverAs: "followUp" });
+      }
+    } catch {
+      // outbox unreadable this tick (e.g. fs race); retry next tick
     }
   }, 15_000);
 
