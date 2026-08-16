@@ -1,2 +1,11 @@
 node_modules/
 dist/
+
+# Runtime state & secrets — never commit
+econbench-state/
+wallet.json
+*.env
+.env
+
+# SDD scratch workspace
+.superpowers/
