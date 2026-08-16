@@ -6,6 +6,21 @@ import { getBalances } from "./balances.js";
 import { readStartMs, readLoanBalance } from "./ledger.js";
 import { dayNumber } from "./budget.js";
 import { appendOutbox, appendOpsLog, writeLoanBalance, tailInbox } from "./ops.js";
+import {
+  sgr,
+  fmtMoney,
+  computeColor,
+  loanColor,
+  relativeTime,
+  fmtUptime,
+  truncate,
+  padVisible,
+  visibleWidth,
+  boxTop,
+  boxBottom,
+  boxDivider,
+  boxLine,
+} from "./tui-render.js";
 
 const DIR = process.env.ECONBENCH_DIR ?? join(homedir(), "econbench-state");
 
@@ -15,6 +30,9 @@ const ALT_SCREEN_OFF = `${ESC}[?1049l`;
 const HIDE_CURSOR = `${ESC}[?25l`;
 const SHOW_CURSOR = `${ESC}[?25h`;
 const CLEAR = `${ESC}[2J${ESC}[H`;
+
+const MIN_WIDTH = 60;
+const MAX_WIDTH = 96;
 
 type Balances = { usdcUsd: number; computeUsd: number; ts: string } | null;
 
@@ -36,11 +54,6 @@ let inputMode = false;
 let redrawTimer: ReturnType<typeof setInterval> | null = null;
 let balanceTimer: ReturnType<typeof setInterval> | null = null;
 
-function fmtUsd(n: number | undefined | null): string {
-  if (n === undefined || n === null || Number.isNaN(n)) return "?";
-  return `$${n.toFixed(2)}`;
-}
-
 async function refreshBalances() {
   if (state.balancesLoading) return;
   state.balancesLoading = true;
@@ -55,6 +68,11 @@ async function refreshBalances() {
   }
 }
 
+function termWidth(): number {
+  const cols = process.stdout.columns ?? 80;
+  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, cols));
+}
+
 function render() {
   if (inputMode) return;
   mkdirSync(DIR, { recursive: true });
@@ -63,38 +81,105 @@ function render() {
   const day = dayNumber(startMs, now);
   const loan = readLoanBalance(DIR);
   const inbox = tailInbox(DIR, 10);
+  const width = termWidth();
+  const innerW = width - 4;
 
   const lines: string[] = [];
-  lines.push("=== econbench operator ===");
-  lines.push(`dir: ${DIR}`);
-  lines.push("");
+
+  // ---- header ----
+  const title = "ECONBENCH OPERATOR";
+  const rightMeta = `day ${day}  ·  up ${fmtUptime(startMs, now)}`;
+  const headerLeft = sgr(["bold", "brightWhite"], title);
+  const headerGap = Math.max(1, innerW - visibleWidth(title) - visibleWidth(rightMeta));
+  lines.push(boxTop(width));
+  lines.push(boxLine(headerLeft + " ".repeat(headerGap) + sgr(["gray"], rightMeta), width));
+  lines.push(boxLine(sgr(["dim", "gray"], truncate(`dir: ${DIR}`, innerW)), width));
+  lines.push(boxDivider(width));
+
+  // ---- vitals (the numbers that matter) ----
+  let usdcStr: string;
+  let computeStr: string;
+  let asOf: string;
   if (state.balancesError) {
-    lines.push(`USDC: (error)   compute: (error)   [${state.balancesError}]`);
+    usdcStr = sgr(["bold", "brightRed"], "ERROR");
+    computeStr = sgr(["bold", "brightRed"], "ERROR");
+    asOf = sgr(["red"], truncate(state.balancesError.replace(/\s+/g, " ").trim(), innerW - 8));
   } else if (state.balances) {
-    lines.push(
-      `USDC: ${fmtUsd(state.balances.usdcUsd)}   compute: ${fmtUsd(state.balances.computeUsd)}   (as of ${state.balances.ts})`,
-    );
+    usdcStr = sgr(["bold", "brightCyan"], fmtMoney(state.balances.usdcUsd));
+    computeStr = sgr(computeColor(state.balances.computeUsd), fmtMoney(state.balances.computeUsd));
+    asOf = sgr(["dim", "gray"], `as of ${relativeTime(state.balances.ts, now)}`);
   } else {
-    lines.push("USDC: ...   compute: ...");
+    usdcStr = sgr(["dim"], "...");
+    computeStr = sgr(["dim"], "...");
+    asOf = sgr(["dim", "gray"], "waiting for first balance check");
   }
-  lines.push(`day: ${day}    outstanding loan: ${fmtUsd(loan)}`);
-  lines.push("");
-  lines.push("--- last 10 inbox entries (newest highlighted) ---");
+  const loanStr = sgr(loanColor(loan), fmtMoney(loan));
+
+  // Three metric columns, sized to fit the narrowest supported width (60 cols).
+  // Labels stay short so label+value never overflows its column.
+  const metrics: { label: string; value: string; plainValue: string }[] = [
+    { label: "USDC", value: usdcStr, plainValue: state.balancesError ? "ERROR" : state.balances ? fmtMoney(state.balances.usdcUsd) : "..." },
+    { label: "COMPUTE", value: computeStr, plainValue: state.balancesError ? "ERROR" : state.balances ? fmtMoney(state.balances.computeUsd) : "..." },
+    { label: "LOAN OUT", value: loanStr, plainValue: fmtMoney(loan) },
+  ];
+  const colW = Math.max(10, Math.floor(innerW / 3));
+  const labelRow = metrics.map((m) => padVisible(sgr(["gray"], m.label), colW)).join("");
+  const valueRow = metrics
+    .map((m) => {
+      const plain = truncate(m.plainValue, colW - 1);
+      // rebuild colored value truncated to the same plain text if truncation occurred
+      const cell = plain === m.plainValue ? m.value : plain;
+      return padVisible(cell, colW);
+    })
+    .join("");
+  lines.push(boxLine(labelRow, width));
+  lines.push(boxLine(valueRow, width));
+  lines.push(boxLine(asOf, width));
+  lines.push(boxDivider(width));
+
+  // ---- inbox ----
+  const inboxHeader = sgr(["bold", "gray"], "INBOX") + sgr(["dim", "gray"], `  (last ${inbox.length})`);
+  lines.push(boxLine(inboxHeader, width));
   if (inbox.length === 0) {
-    lines.push("(empty)");
+    lines.push(boxLine(sgr(["dim", "gray"], "no requests yet — the agent has not asked for anything"), width));
   } else {
     inbox.forEach((entry, i) => {
       const isNewest = i === inbox.length - 1;
-      const text = `[${entry.ts ?? "?"}] ${entry.kind ?? ""}: ${entry.body ?? JSON.stringify(entry)}`;
-      lines.push(isNewest ? `${ESC}[1;33m> ${text}${ESC}[0m` : `  ${text}`);
+      const rel = relativeTime(entry.ts, now);
+      const kind = entry.kind ?? "?";
+      const rawBody = typeof entry.body === "string" ? entry.body : JSON.stringify(entry.body ?? entry);
+      const body = rawBody.replace(/\s+/g, " ").trim();
+      const marker = isNewest ? sgr(["bold", "brightYellow"], "▶") : " ";
+      const relCol = sgr(isNewest ? ["bold", "brightYellow"] : ["dim", "gray"], padVisible(rel, 8, "left"));
+      const kindCol = sgr(isNewest ? ["bold", "brightYellow"] : ["cyan"], padVisible(kind, 11, "left"));
+      const prefixWidth = 2 + 8 + 1 + 11 + 1; // marker+space, rel, space, kind, space
+      const bodyW = Math.max(4, innerW - prefixWidth);
+      const bodyText = truncate(body, bodyW);
+      const bodyCol = isNewest ? sgr(["bold", "white"], bodyText) : sgr(["gray"], bodyText);
+      lines.push(boxLine(`${marker} ${relCol} ${kindCol} ${bodyCol}`, width));
     });
   }
-  lines.push("");
-  lines.push(`status: ${state.status}`);
-  lines.push("");
-  lines.push(
-    "[a] allocate  [g] grant loan  [d] deny loan  [c] margin call  [s] settle loan  [k] kill  [q] quit",
-  );
+  lines.push(boxDivider(width));
+
+  // ---- status ----
+  const statusClean = state.status.replace(/\s+/g, " ").trim();
+  lines.push(boxLine(sgr(["gray"], "status ") + sgr(["white"], truncate(statusClean, innerW - 7)), width));
+  lines.push(boxBottom(width));
+
+  // ---- footer legend ----
+  const legendItems: [string, string][] = [
+    ["a", "allocate"],
+    ["g", "grant loan"],
+    ["d", "deny loan"],
+    ["c", "margin call"],
+    ["s", "settle loan"],
+    ["k", "kill"],
+    ["q", "quit"],
+  ];
+  const legend = legendItems
+    .map(([k, label]) => sgr(["bold", "brightWhite"], `[${k}]`) + sgr(["gray"], ` ${label}`))
+    .join(sgr(["dim", "gray"], "  ·  "));
+  lines.push(legend);
 
   process.stdout.write(CLEAR + lines.join("\r\n") + "\r\n");
 }
@@ -112,7 +197,8 @@ function startRawInput() {
 function prompt(question: string): Promise<string> {
   inputMode = true;
   stopRawInput();
-  process.stdout.write(SHOW_CURSOR + "\r\n" + question);
+  const styled = sgr(["bold", "brightCyan"], "?") + " " + sgr(["bold", "white"], question);
+  process.stdout.write(SHOW_CURSOR + "\r\n" + styled);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question("", (answer) => {
@@ -143,14 +229,14 @@ async function doAllocate() {
 }
 
 async function doGrantLoan() {
-  const amountStr = await prompt("Grant loan: amount USD > ");
+  const current = readLoanBalance(DIR);
+  const amountStr = await prompt(`Grant loan (current balance ${fmtMoney(current)}): amount USD > `);
   const amount = Number(amountStr);
   if (!amountStr || Number.isNaN(amount)) {
     state.status = "Loan grant cancelled: invalid amount";
     return;
   }
   const note = await prompt("note > ");
-  const current = readLoanBalance(DIR);
   writeLoanBalance(DIR, current + amount);
   appendOpsLog(DIR, { action: "grant_loan", amountUsd: amount, note, newBalance: current + amount });
   appendOutbox(DIR, `Loan granted: $${amount}. New balance: $${(current + amount).toFixed(2)}. ${note}`);
@@ -165,14 +251,16 @@ async function doDenyLoan() {
 }
 
 async function doMarginCall() {
-  const note = await prompt("Margin call: note > ");
+  const current = readLoanBalance(DIR);
+  const note = await prompt(`Margin call (outstanding loan ${fmtMoney(current)}): note > `);
   appendOpsLog(DIR, { action: "margin_call", note });
   appendOutbox(DIR, `Margin call: repay outstanding loan. ${note}`);
   state.status = "Margin call sent";
 }
 
 async function doSettleLoan() {
-  const valueStr = await prompt("Settle/adjust loan: new balance USD > ");
+  const current = readLoanBalance(DIR);
+  const valueStr = await prompt(`Settle/adjust loan (current balance ${fmtMoney(current)}): new balance USD > `);
   const value = Number(valueStr);
   if (!valueStr || Number.isNaN(value)) {
     state.status = "Settle cancelled: invalid amount";
