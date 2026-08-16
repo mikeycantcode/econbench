@@ -1,15 +1,16 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { statSync, existsSync, readFileSync } from "node:fs";
+import { statSync, existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { shouldCompact, journalStale, dayNumber, DAY_MS } from "./budget.js";
-import { appendLedger, queueOperator, readStartMs } from "./ledger.js";
+import { appendLedger, queueOperator, readStartMs, readLoanBalance } from "./ledger.js";
 import { resolveBalanceSource, dayMs, isDryRun } from "./dryrun.js";
 
 const DIR = process.env.ECONBENCH_DIR ?? join(homedir(), "econbench-state");
 
 export default function (pi: ExtensionAPI) {
+  mkdirSync(DIR, { recursive: true });
   const startMs = readStartMs(DIR);
   const balanceSource = resolveBalanceSource(startMs);
   const dayMsResolved = isDryRun() ? dayMs() : DAY_MS;
@@ -120,6 +121,11 @@ export default function (pi: ExtensionAPI) {
   // 4. Hourly ledger.
   setInterval(async () => {
     const b = await balanceSource().catch((e) => ({ error: String(e) }));
-    appendLedger(DIR, { day: dayNumber(startMs, Date.now(), dayMsResolved), ...b, ...(isDryRun() ? { dryRun: true } : {}) });
+    appendLedger(DIR, {
+      day: dayNumber(startMs, Date.now(), dayMsResolved),
+      ...b,
+      loanUsd: readLoanBalance(DIR),
+      ...(isDryRun() ? { dryRun: true } : {}),
+    });
   }, 3600_000);
 }

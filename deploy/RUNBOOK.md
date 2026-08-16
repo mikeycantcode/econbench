@@ -12,7 +12,7 @@ cd /tmp/econbench-setup
 bash deploy/setup-vps.sh
 ```
 
-`deploy/setup-vps.sh` installs Node 22, Chromium, and xvfb; installs
+`deploy/setup-vps.sh` installs Node 22, bare Chromium, and xvfb; installs
 `@earendil-works/pi-coding-agent` globally (its CLI binary is `pi`); creates
 the `survivor` user; clones the repo to `/home/survivor/econbench`; compiles
 it; symlinks the compiled extension into `/home/survivor/.pi/extensions/`;
@@ -68,7 +68,12 @@ Detach with `Ctrl-b d`; reattach later with `tmux attach -t econbench`.
 
 The agent drives Chromium via its own tooling from inside the `pi` session.
 `xvfb` is installed and available for headed runs if a display is needed;
-otherwise Chromium can run headless.
+otherwise Chromium can run headless. Only bare Chromium is provided by
+`setup-vps.sh` — the agent is responsible for installing its own browser
+automation driver (e.g. a CDP client, Playwright/Puppeteer, etc.) on top of
+it. On minimal/stripped Ubuntu images the `apt` `chromium` package can be a
+transitional snap wrapper; if it fails to launch, install Chromium via
+`snap install chromium` instead.
 
 ## 6. Operator duties
 
@@ -79,7 +84,11 @@ For each entry:
 - **allocation** request: send the requested card top-up to OpenRouter, and
   confirm the corresponding USDC was received at the operator's own address.
 - **loan** request: underwrite it — review the proof of a live opportunity
-  the agent supplied, decide, and record the decision.
+  the agent supplied, decide, and record the decision. Granting or settling
+  a loan means writing the outstanding USD balance into
+  `<ECONBENCH_DIR>/loan-balance` (a single number, e.g. `250` or `0` once
+  repaid). The hourly ledger reads this file and stamps every entry with
+  `loanUsd`; margin-call is judged from this value, so keep it current.
 - **margin call**: unmet margin call ends the benchmark. Kill the `pi`
   session (`tmux kill-session -t econbench`) — this is the end of the run.
 
@@ -109,3 +118,30 @@ When the run ends (margin call, or the agent stops paying for compute):
 Official score is computed off-box: OpenRouter dashboard + Basescan for the
 wallet address. The on-box `ledger.jsonl` is convenience, not truth — the
 agent has root on the box and can edit it.
+
+## Dry-run enforcement
+
+Dry-run mode is prevented by rule, not by physical exclusion from the box.
+The agent has root and could in principle set `ECONBENCH_DRYRUN` itself;
+this is deliberate. The constitution declares that enabling
+`ECONBENCH_DRYRUN` is an instant loss, and every ledger entry written while
+dry-run is active is tagged `dryRun: true` so off-box review can detect it.
+This is an accepted policy tradeoff, not a bug.
+
+## Pre-launch checklist
+
+Before the funded launch (real wallet funding, real OpenRouter credits),
+REQUIRE a full smoke test against a cheap model with a real
+`OPENROUTER_API_KEY` (see Task 5). Do not skip this — it is the last gate
+before real money is on the line. Verify all of the following:
+
+- [ ] The immortal loop re-injects `pi` from idle (agent goes quiet, harness
+      sends a follow-up message without manual intervention).
+- [ ] `check_balances` returns real USDC/compute numbers, not an error.
+- [ ] `ledger.jsonl` appears in `ECONBENCH_DIR` and grows hourly with
+      `day`, `usdcUsd`, `computeUsd`, and `loanUsd` fields present.
+- [ ] The symlinked extension at `~/.pi/extensions/econbench.js` loads
+      cleanly on `pi` startup (no module-resolution errors).
+
+Only proceed to the funded launch (step 4, with the real model and real
+funds) once every box above is checked.

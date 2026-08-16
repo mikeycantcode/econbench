@@ -15,3 +15,10 @@ export function readStartMs(dir: string): number {
   if (!existsSync(f)) writeFileSync(f, String(Date.now()));
   return Number(readFileSync(f, "utf8"));
 }
+
+export function readLoanBalance(dir: string): number {
+  const f = join(dir, "loan-balance");
+  if (!existsSync(f)) return 0;
+  const n = Number(readFileSync(f, "utf8").trim());
+  return Number.isNaN(n) ? 0 : n;
+}

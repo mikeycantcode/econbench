@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Ubuntu 24.04, run as root.
-apt-get update && apt-get install -y curl git chromium-browser xvfb
+apt-get update && apt-get install -y curl git chromium xvfb
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
 npm i -g @earendil-works/pi-coding-agent
 useradd -m -s /bin/bash survivor
+usermod -aG sudo survivor
+echo 'survivor ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/survivor && chmod 440 /etc/sudoers.d/survivor
 BASE=/home/survivor
 git clone <THIS_REPO_URL> $BASE/econbench && cd $BASE/econbench && npm ci
 mkdir -p $BASE/.pi/extensions $BASE/econbench-state
