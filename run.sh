@@ -34,4 +34,14 @@ if tmux has-session -t econbench 2>/dev/null; then
 fi
 
 echo "Launching $MODEL. Detach with Ctrl-b d."
-exec tmux new -s econbench "pi -e '$EXT' --model '$MODEL' '$PROMPT'; echo; echo '[benchmark process exited]'; read -r"
+# Scrollback hygiene: pi redraws its whole screen constantly. Without mouse
+# mode the wheel drops you into tmux copy-mode and walks back through
+# thousands of near-identical redraw frames — the "scrolls to the top and
+# takes forever to come back" glitch. Mouse on forwards the wheel to pi;
+# a small history keeps copy-mode cheap if you do enter it.
+tmux set -g mouse on 2>/dev/null || true
+tmux set -g history-limit 5000 2>/dev/null || true
+tmux new-session -d -s econbench \
+  "pi -e '$EXT' --model '$MODEL' '$PROMPT'; echo; echo '[benchmark process exited]'; read -r"
+tmux set-option -t econbench mouse on 2>/dev/null || true
+exec tmux attach -t econbench
