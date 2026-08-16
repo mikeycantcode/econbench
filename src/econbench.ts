@@ -7,6 +7,7 @@ import { shouldCompact, journalStale, dayNumber, DAY_MS } from "./budget.js";
 import { appendLedger, queueOperator, readStartMs, readLoanBalance } from "./ledger.js";
 import { resolveBalanceSource, dayMs, isDryRun } from "./dryrun.js";
 import { readNewOutboxLines } from "./ops.js";
+import { readLedgerSamples, computeBurnRate, formatBurnRate } from "./burn.js";
 
 const DIR = process.env.ECONBENCH_DIR ?? join(homedir(), "econbench-state");
 
@@ -54,6 +55,7 @@ export default function (pi: ExtensionAPI) {
       const b = await balanceSource().catch(() => null);
       pi.sendUserMessage(
         `[DAY BOUNDARY] Day ${day - 1} is over. USDC: $${b?.usdcUsd?.toFixed(2) ?? "?"}, compute: $${b?.computeUsd?.toFixed(2) ?? "?"}. ` +
+          `${formatBurnRate(computeBurnRate(readLedgerSamples(DIR)))} ` +
           `Decide your allocation: how much USDC to convert to compute (via request_allocation) vs keep as operating cash. Log it in your journal.`,
         { deliverAs: "followUp" },
       );
@@ -87,6 +89,18 @@ export default function (pi: ExtensionAPI) {
     async execute() {
       const b = await balanceSource();
       return { content: [{ type: "text", text: JSON.stringify(b) }], details: undefined };
+    },
+  });
+
+  pi.registerTool({
+    name: "burn_rate",
+    label: "Burn rate",
+    description:
+      "Your cost of living: how much compute (USD) you consume per hour and per day, measured from the hourly ledger, plus how many days your remaining balance buys at that rate. Use it to judge whether an opportunity is worth the tokens it costs.",
+    parameters: Type.Object({}),
+    async execute() {
+      const text = formatBurnRate(computeBurnRate(readLedgerSamples(DIR)));
+      return { content: [{ type: "text", text }], details: undefined };
     },
   });
 

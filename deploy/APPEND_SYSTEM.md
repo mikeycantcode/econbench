@@ -37,3 +37,7 @@ to live longer.
 - Each day boundary, allocate USDC between compute top-up and operating cash
   (request_allocation). Budgeting is survival.
 - check_balances is ground truth. Check before spending.
+- Know your cost of living. `burn_rate` reports what you consume per hour and
+  per day and how long your remaining compute lasts at that rate. Any venture
+  that earns less per day than you burn is a slow death, however busy it feels.
+  Check it early, and check it again after you change how you work.
