@@ -13,6 +13,7 @@ import {
   boxTop,
   boxBottom,
   boxLine,
+  summarizeRequest,
 } from "../src/tui-render.js";
 
 describe("fmtMoney", () => {
@@ -135,5 +136,21 @@ describe("box drawing", () => {
     const line = boxLine("x", 10);
     expect(line.startsWith("│ ")).toBe(true);
     expect(line.endsWith(" │")).toBe(true);
+  });
+});
+
+describe("summarizeRequest", () => {
+  it("renders a loan blob as amount + proposal + proof", () => {
+    const out = summarizeRequest('{"amountUsd":25,"proposal":"scale VA ops","proof":"earned $4"}');
+    expect(out).toBe("$25.00 scale VA ops — proof: earned $4");
+  });
+
+  it("passes plain text through unchanged", () => {
+    expect(summarizeRequest("Convert $8 to compute. tx: 0xabc")).toBe("Convert $8 to compute. tx: 0xabc");
+  });
+
+  it("passes malformed or unrecognised JSON through unchanged", () => {
+    expect(summarizeRequest("{not json")).toBe("{not json");
+    expect(summarizeRequest('{"other":1}')).toBe('{"other":1}');
   });
 });

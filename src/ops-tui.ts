@@ -20,6 +20,7 @@ import {
   boxBottom,
   boxDivider,
   boxLine,
+  summarizeRequest,
 } from "./tui-render.js";
 
 const DIR = process.env.ECONBENCH_DIR ?? join(homedir(), "econbench-state");
@@ -148,7 +149,7 @@ function render() {
       const rel = relativeTime(entry.ts, now);
       const kind = entry.kind ?? "?";
       const rawBody = typeof entry.body === "string" ? entry.body : JSON.stringify(entry.body ?? entry);
-      const body = rawBody.replace(/\s+/g, " ").trim();
+      const body = summarizeRequest(rawBody).replace(/\s+/g, " ").trim();
       const marker = isNewest ? sgr(["bold", "brightYellow"], "▶") : " ";
       const relCol = sgr(isNewest ? ["bold", "brightYellow"] : ["dim", "gray"], padVisible(rel, 8, "left"));
       const kindCol = sgr(isNewest ? ["bold", "brightYellow"] : ["cyan"], padVisible(kind, 11, "left"));

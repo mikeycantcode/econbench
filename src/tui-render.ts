@@ -136,3 +136,25 @@ export function boxLine(content: string, width: number): string {
 export function labelValue(label: string, value: string, labelWidth: number): string {
   return padVisible(label, labelWidth) + value;
 }
+
+/**
+ * Loan requests arrive as a JSON blob ({amountUsd, proposal, proof}). Raw JSON
+ * is the least readable form of the thing the operator most needs to act on,
+ * so render it as an amount and a proposal. Non-JSON bodies pass through.
+ */
+export function summarizeRequest(body: string): string {
+  const t = body.trim();
+  if (!t.startsWith("{")) return body;
+  try {
+    const o = JSON.parse(t);
+    if (typeof o?.amountUsd === "number") {
+      const parts = [`$${o.amountUsd.toFixed(2)}`];
+      if (typeof o.proposal === "string" && o.proposal.trim()) parts.push(o.proposal.trim());
+      if (typeof o.proof === "string" && o.proof.trim()) parts.push(`— proof: ${o.proof.trim()}`);
+      return parts.join(" ");
+    }
+    return body;
+  } catch {
+    return body;
+  }
+}
