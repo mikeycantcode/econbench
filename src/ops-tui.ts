@@ -8,6 +8,14 @@ import { dayNumber } from "./budget.js";
 import { appendOutbox, appendOpsLog, writeLoanBalance, tailInbox } from "./ops.js";
 import { readDescendants } from "./swarm.js";
 import {
+  readRevenue,
+  appendRevenue,
+  settledRevenue,
+  confirmedTotal,
+  milestonesReached,
+  nextMilestone,
+} from "./revenue.js";
+import {
   sgr,
   fmtMoney,
   computeColor,
@@ -140,6 +148,33 @@ function render() {
   lines.push(boxLine(asOf, width));
   lines.push(boxDivider(width));
 
+  // ---- revenue (the score) ----
+  const revEvents = readRevenue(DIR);
+  const revConfirmed = confirmedTotal(revEvents);
+  const revScore = milestonesReached(revConfirmed);
+  const revNext = nextMilestone(revConfirmed);
+  const revPendingCount = settledRevenue(revEvents).filter((e) => e.status === "claimed").length;
+  lines.push(boxLine(sgr(["bold", "gray"], "REVENUE"), width));
+  lines.push(
+    boxLine(
+      sgr(["gray"], "earned  ") +
+        sgr(["bold", "brightGreen"], fmtMoney(revConfirmed)) +
+        sgr(["dim", "gray"], "   score  ") +
+        sgr(["bold", "brightWhite"], `${revScore}`) +
+        sgr(["dim", "gray"], `   next  $${revNext}`),
+      width,
+    ),
+  );
+  if (revPendingCount > 0) {
+    lines.push(
+      boxLine(
+        sgr(["bold", "brightYellow"], `${revPendingCount} claim${revPendingCount === 1 ? "" : "s"} awaiting verification — press [v]`),
+        width,
+      ),
+    );
+  }
+  lines.push(boxDivider(width));
+
   // ---- swarm (instance-days score, deadline, roster) ----
   const swarmHeader = sgr(["bold", "gray"], "SWARM");
   lines.push(boxLine(swarmHeader, width));
@@ -190,6 +225,7 @@ function render() {
     ["d", "deny loan"],
     ["c", "margin call"],
     ["s", "settle loan"],
+    ["v", "verify revenue"],
     ["r", "reply"],
     ["k", "kill"],
     ["q", "quit"],
@@ -291,6 +327,37 @@ async function doSettleLoan() {
   state.status = `Loan balance set to $${value.toFixed(2)}`;
 }
 
+async function doVerifyRevenue() {
+  const events = readRevenue(DIR);
+  const pending = settledRevenue(events).filter((e) => e.status === "claimed");
+  if (pending.length === 0) {
+    state.status = "No unverified revenue claims.";
+    return;
+  }
+  for (const e of pending) {
+    const answer = await prompt(
+      `Verify $${e.amountUsd.toFixed(2)} from "${e.source}" (evidence: ${e.evidence}) — [y]es / [n]o / [s]kip: `,
+    );
+    const a = answer.trim().toLowerCase();
+    if (a === "y") {
+      appendRevenue(DIR, { ...e, status: "confirmed", ruledTs: new Date().toISOString() });
+      appendOpsLog(DIR, { action: "revenue-confirm", amountUsd: e.amountUsd, source: e.source });
+      appendOutbox(DIR, `Revenue confirmed: $${e.amountUsd.toFixed(2)} from ${e.source}. It now counts toward your score.`);
+    } else if (a === "n") {
+      appendRevenue(DIR, { ...e, status: "rejected", ruledTs: new Date().toISOString() });
+      appendOpsLog(DIR, { action: "revenue-reject", amountUsd: e.amountUsd, source: e.source });
+      appendOutbox(
+        DIR,
+        `Revenue REJECTED: $${e.amountUsd.toFixed(2)} from ${e.source}. It does not count. Only money paid to you by a third party is revenue.`,
+      );
+    } else {
+      break;
+    }
+  }
+  const total = confirmedTotal(readRevenue(DIR));
+  state.status = `Confirmed revenue now $${total.toFixed(2)} — ${milestonesReached(total)} milestones.`;
+}
+
 async function doReply() {
   const text = await prompt("Message to the agent: ");
   if (!text.trim()) {
@@ -338,6 +405,9 @@ async function handleKey(key: string) {
       break;
     case "s":
       await doSettleLoan();
+      break;
+    case "v":
+      await doVerifyRevenue();
       break;
     case "r":
       await doReply();

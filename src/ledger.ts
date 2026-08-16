@@ -7,7 +7,7 @@ export function appendLedger(dir: string, entry: object) {
 
 export function queueOperator(
   dir: string,
-  kind: "allocation" | "loan" | "spawn" | "question",
+  kind: "allocation" | "loan" | "spawn" | "question" | "revenue",
   body: string,
 ) {
   appendFileSync(join(dir, "operator-inbox.jsonl"),
