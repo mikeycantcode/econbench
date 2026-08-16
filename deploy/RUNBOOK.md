@@ -66,14 +66,15 @@ Detach with `Ctrl-b d`; reattach later with `tmux attach -t econbench`.
 
 ## 5. Browser
 
-The agent drives Chromium via its own tooling from inside the `pi` session.
-`xvfb` is installed and available for headed runs if a display is needed;
-otherwise Chromium can run headless. Only bare Chromium is provided by
-`setup-vps.sh` — the agent is responsible for installing its own browser
-automation driver (e.g. a CDP client, Playwright/Puppeteer, etc.) on top of
-it. On minimal/stripped Ubuntu images the `apt` `chromium` package can be a
-transitional snap wrapper; if it fails to launch, install Chromium via
-`snap install chromium` instead.
+Browser automation is pre-installed, ready to script on day 1: `setup-vps.sh`
+creates `/home/survivor/browser` with Playwright and Playwright's own Chromium
+build (`npx playwright install --with-deps chromium`), owned by `survivor`.
+The constitution points the agent there. Headless works out of the box; `xvfb`
+is installed for headed runs (`xvfb-run`). The apt `chromium` package is also
+installed as a plain fallback browser; on minimal/stripped Ubuntu images that
+apt package can be a transitional snap wrapper — if it fails to launch, use
+`snap install chromium`, or ignore it entirely since Playwright bundles its
+own Chromium and does not depend on the apt package.
 
 ## 6. Operator duties
 
