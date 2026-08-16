@@ -25,17 +25,21 @@ export function readNewOutboxLines(dir: string, fromOffset: number): { lines: { 
     closeSync(fd);
   }
 
-  const chunk = buf.toString("utf8");
-  const lastNewline = chunk.lastIndexOf("\n");
+  const lastNewline = buf.lastIndexOf(0x0a);
   if (lastNewline === -1) {
     return { lines: [], offset: fromOffset };
   }
 
-  const complete = chunk.slice(0, lastNewline);
-  const lines = complete
-    .split("\n")
-    .filter((l) => l.length > 0)
-    .map((l) => JSON.parse(l));
+  const complete = buf.subarray(0, lastNewline).toString("utf8");
+  const lines: { ts: string; text: string }[] = [];
+  for (const l of complete.split("\n")) {
+    if (l.length === 0) continue;
+    try {
+      lines.push(JSON.parse(l));
+    } catch {
+      // skip unparseable lines
+    }
+  }
 
   return { lines, offset: fromOffset + lastNewline + 1 };
 }

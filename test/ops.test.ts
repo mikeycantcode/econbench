@@ -75,6 +75,28 @@ it("readNewOutboxLines: tolerates partial trailing line, leaving it for next rea
   expect(result2.lines.map((l) => l.text)).toEqual(["partial"]);
 });
 
+it("readNewOutboxLines: handles multi-byte UTF-8 content without desyncing offset", () => {
+  const dir = mkdtempSync(join(tmpdir(), "eb-"));
+  appendOutbox(dir, "café → 💰");
+  const offsetAfterFirst = statSync(join(dir, "operator-outbox.jsonl")).size;
+
+  appendOutbox(dir, "second line");
+
+  const result = readNewOutboxLines(dir, offsetAfterFirst);
+  expect(result.lines.map((l) => l.text)).toEqual(["second line"]);
+  expect(result.offset).toBe(statSync(join(dir, "operator-outbox.jsonl")).size);
+});
+
+it("readNewOutboxLines: skips unparseable lines instead of throwing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "eb-"));
+  appendOutbox(dir, "good line 1");
+  appendFileSync(join(dir, "operator-outbox.jsonl"), "not json at all\n");
+  appendOutbox(dir, "good line 2");
+
+  const result = readNewOutboxLines(dir, 0);
+  expect(result.lines.map((l) => l.text)).toEqual(["good line 1", "good line 2"]);
+});
+
 it("writeLoanBalance: writes usd value readable back", () => {
   const dir = mkdtempSync(join(tmpdir(), "eb-"));
   writeLoanBalance(dir, 42.5);
