@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Ubuntu 24.04, run as root.
+# Ubuntu 24.04, run as root. The agent runs AS root — no dedicated user.
 apt-get update && apt-get install -y curl git chromium xvfb
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
 npm i -g @earendil-works/pi-coding-agent
-useradd -m -s /bin/bash survivor
-usermod -aG sudo survivor
-echo 'survivor ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/survivor && chmod 440 /etc/sudoers.d/survivor
-BASE=/home/survivor
+BASE=/root
 git clone https://github.com/mikeycantcode/econbench.git $BASE/econbench && cd $BASE/econbench && npm ci
-# Ready-to-use browser automation: Playwright + its own Chromium build, installed
-# for the survivor user so the agent scripts pages on day 1 instead of fighting tooling.
-sudo -u survivor mkdir -p $BASE/browser && cd $BASE/browser
-sudo -u survivor npm init -y >/dev/null && sudo -u survivor npm i playwright
-sudo -u survivor npx playwright install --with-deps chromium
+# Ready-to-use browser automation: Playwright + its own Chromium build, so the
+# agent scripts pages on day 1 instead of fighting tooling.
+mkdir -p $BASE/browser && cd $BASE/browser
+npm init -y >/dev/null && npm i playwright
+npx playwright install --with-deps chromium
 cd $BASE/econbench
 mkdir -p $BASE/.pi/extensions $BASE/econbench-state
 cp deploy/APPEND_SYSTEM.md $BASE/.pi/
@@ -30,6 +27,5 @@ npx tsc
 ln -sf $BASE/econbench/dist/src/econbench.js $BASE/.pi/extensions/econbench.js
 node dist/deploy/wallet-gen.js > $BASE/econbench-state/wallet.json
 chmod 600 $BASE/econbench-state/wallet.json
-chown -R survivor:survivor $BASE
 echo "Now: fund wallet with \$30 USDC on Base, load \$20 on the OpenRouter key,"
 echo "log in Telegram, set AgentMail creds in $BASE/econbench-state/, write README-keys.md."
