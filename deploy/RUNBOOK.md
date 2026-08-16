@@ -24,16 +24,12 @@ fork the repo, update the clone URL in `deploy/setup-vps.sh` to match.
 
 ## 2. Env file
 
-Create `/root/econbench.env` (mode 600):
+Create `/root/econbench/.env` (project root, next to `.env.example`, mode 600):
 
 ```bash
-cat > /root/econbench.env <<EOF
-OPENROUTER_API_KEY=sk-or-v1-...
-BASE_RPC_URL=https://mainnet.base.org
-AGENT_WALLET_ADDRESS=0x...   # address from econbench-state/wallet.json
-ECONBENCH_DIR=/root/econbench-state
-EOF
-chmod 600 /root/econbench.env
+cp /root/econbench/.env.example /root/econbench/.env
+# edit OPENROUTER_API_KEY and AGENT_WALLET_ADDRESS; the other two are correct defaults
+chmod 600 /root/econbench/.env
 ```
 
 - `BASE_RPC_URL`: use a public Base RPC, e.g. `https://mainnet.base.org`.
@@ -55,7 +51,7 @@ command does not need `--append-system-prompt`.
 ## 4. Launch under tmux, as root
 
 ```bash
-set -a; source ~/econbench.env; set +a
+set -a; source /root/econbench/.env; set +a
 tmux new -s econbench
 cd ~
 pi --model deepseek/deepseek-v4-flash-0731 "Read your constitution. Day 1 begins now. Survive."
@@ -98,7 +94,7 @@ When the run ends (margin call, or the agent stops paying for compute):
 
 1. Verify death:
    - Compute credits: query the OpenRouter credits API for the key in
-     `econbench.env`; confirm remaining balance is `<= $0.01`.
+     `.env`; confirm remaining balance is `<= $0.01`.
    - No allocation queued: confirm `operator-inbox.jsonl` has no pending
      unresolved `allocation` entries.
 2. Take a final ledger snapshot:
