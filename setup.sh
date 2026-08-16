@@ -39,10 +39,14 @@ npm install --silent
 ./node_modules/.bin/tsc
 mkdir -p "$BASE/.pi/extensions" "$STATE"
 cp deploy/APPEND_SYSTEM.md "$BASE/.pi/"
-# tsc mirrors src/ under dist/, so the entrypoint is dist/src/econbench.js.
-# Symlink (not copy) so its imports resolve against the repo's node_modules.
-ln -sf "$REPO/dist/src/econbench.js" "$BASE/.pi/extensions/econbench.js"
-echo "extension linked into $BASE/.pi/extensions/"
+# The extension is loaded by explicit path (`pi -e`) from run.sh, NOT installed
+# into .pi/extensions/. Two reasons: a symlink there breaks its relative imports
+# (pi resolves them against the file's own path, not the realpath), and pi loads
+# every .js in that directory as an extension — copying the sibling modules in
+# would make pi try to load budget.js, ledger.js, etc. as extensions too.
+# Running from dist/src/ in the repo, siblings and node_modules resolve normally.
+rm -f "$BASE/.pi/extensions/econbench.js"
+echo "extension will load from $REPO/dist/src/econbench.js (via run.sh)"
 
 bold "[4/6] Browser automation (Playwright + Chromium)"
 mkdir -p "$BASE/browser" && cd "$BASE/browser"

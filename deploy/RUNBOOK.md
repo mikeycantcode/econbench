@@ -16,7 +16,7 @@ cd econbench
 missing, installs Node 22 / `@earendil-works/pi-coding-agent` (CLI binary `pi`) /
 Chromium / xvfb / tmux, removes the apt `pi` package (a π-digit calculator that
 squats `/usr/bin/pi`), builds the project with the local TypeScript compiler,
-symlinks the extension into `/root/.pi/extensions/`, copies the constitution to
+copies the constitution to
 `/root/.pi/APPEND_SYSTEM.md`, installs Playwright + Chromium at `/root/browser`,
 generates `/root/econbench-state/wallet.json` (kept if it already exists), and
 prompts for the OpenRouter / AgentMail / Telegram credentials — writing `.env`
@@ -27,10 +27,14 @@ onto the OpenRouter key.
 
 ## 2. Extension auto-load — no `--append-system-prompt` needed
 
-`pi` auto-loads a project-local `.pi/APPEND_SYSTEM.md` (relative to its
-launch `cwd`) and auto-loads extensions from `.pi/extensions/` the same way
-(confirmed in `docs/pi-api-notes.md`). `setup.sh` places these under `/root`,
-and `run.sh` launches with `cwd=/root`, so both are picked up automatically.
+`pi` auto-loads a project-local `.pi/APPEND_SYSTEM.md` relative to its launch
+`cwd`, and `run.sh` launches with `cwd=/root`, where `setup.sh` placed it.
+
+The extension is NOT installed into `.pi/extensions/`. `run.sh` loads it by
+explicit path (`pi -e /root/econbench/dist/src/econbench.js`) because pi
+resolves an extension's relative imports against the file's own location: from
+`.pi/extensions/` a lone symlink cannot find `./budget.js`, and copying the
+sibling modules in would make pi load each of them as an extension too.
 
 ## 3. Launch
 
