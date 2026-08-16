@@ -136,8 +136,8 @@ before real money is on the line. Verify all of the following:
 - [ ] `check_balances` returns real USDC/compute numbers, not an error.
 - [ ] `ledger.jsonl` appears in `ECONBENCH_DIR` and grows hourly with
       `day`, `usdcUsd`, `computeUsd`, and `loanUsd` fields present.
-- [ ] The symlinked extension at `~/.pi/extensions/econbench.js` loads
-      cleanly on `pi` startup (no module-resolution errors).
+- [ ] The extension loads cleanly on `pi` startup (no module-resolution
+      errors) — `run.sh` passes it via `pi -e dist/src/econbench.js`.
 
 Only proceed to the funded launch (step 4, with the real model and real
 funds) once every box above is checked.
